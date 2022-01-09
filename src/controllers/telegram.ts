@@ -70,8 +70,7 @@ const deleteMessageFromBot = async (chatId: number, messageId: number) => {
 
 export const getMessage: RequestHandler = async (req, res) => {
   const { message } = req.body
-  // let botAnswer: string = 'I don\'t understand you!'
-  let botAnswer: string = 'xz!'
+  let botAnswer: string = 'I don\'t understand you!'
 
   if (req.body?.callback_query?.id) {
     const { answer } = await handleCallbackQuery(req.body?.callback_query?.data, req.body?.callback_query?.message)

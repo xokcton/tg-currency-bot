@@ -72,8 +72,7 @@ const deleteMessageFromBot = (chatId, messageId) => __awaiter(void 0, void 0, vo
 const getMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
     const { message } = req.body;
-    // let botAnswer: string = 'I don\'t understand you!'
-    let botAnswer = 'xz!';
+    let botAnswer = 'I don\'t understand you!';
     if ((_b = (_a = req.body) === null || _a === void 0 ? void 0 : _a.callback_query) === null || _b === void 0 ? void 0 : _b.id) {
         const { answer } = yield (0, telegram_1.handleCallbackQuery)((_d = (_c = req.body) === null || _c === void 0 ? void 0 : _c.callback_query) === null || _d === void 0 ? void 0 : _d.data, (_f = (_e = req.body) === null || _e === void 0 ? void 0 : _e.callback_query) === null || _f === void 0 ? void 0 : _f.message);
         const callbackResponse = yield answerCallbackQuery((_h = (_g = req.body) === null || _g === void 0 ? void 0 : _g.callback_query) === null || _h === void 0 ? void 0 : _h.id, answer);
