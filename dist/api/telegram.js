@@ -8,17 +8,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const node_telegram_bot_api_1 = __importDefault(require("node-telegram-bot-api"));
-const dotenv_1 = __importDefault(require("dotenv"));
+exports.handleCallbackQuery = exports.listFavoriteMessage = exports.deleteFavoriteMessage = exports.addToFavoriteMessage = exports.getCurrencyInfoMessage = exports.listRecentMessage = exports.startMessage = exports.helpMessage = exports.unknownMessage = void 0;
 const currency_1 = require("./currency");
 const telegram_1 = require("../controllers/telegram");
-dotenv_1.default.config();
-const { TOKEN, SERVER_URL } = process.env;
-const bot = new node_telegram_bot_api_1.default(`${TOKEN}`);
 const myCommands = [
     { command: '/start', description: 'Bot greeting' },
     { command: '/help', description: 'Brief information about the bot and its list of commands' },
@@ -28,14 +21,7 @@ const myCommands = [
     { command: '/listFavorite', description: 'Returns a list of selected crypts' },
     { command: '/deleteFavorite', description: 'Removes crypt from "favorites" section' }
 ];
-bot.setWebHook(`${SERVER_URL}/bot${TOKEN}`);
-bot.setMyCommands([
-    { command: '/start', description: 'Bot greeting' },
-    { command: '/help', description: 'Brief information about the bot and its list of commands' }
-]);
-bot.onText(/(.+)/, (msg, match) => __awaiter(void 0, void 0, void 0, function* () {
-    const chatId = msg.chat.id;
-    const resp = match[1];
+const unknownMessage = (resp) => __awaiter(void 0, void 0, void 0, function* () {
     const newArr = [...myCommands.map(element => element.command)];
     const { data } = yield (0, currency_1.getCurrencies)();
     data.forEach((element) => {
@@ -43,36 +29,43 @@ bot.onText(/(.+)/, (msg, match) => __awaiter(void 0, void 0, void 0, function* (
     });
     const index = newArr.indexOf(resp);
     if (index === -1) {
-        bot.sendMessage(chatId, 'I don\'t understand you!');
+        const answer = 'I don\'t understand you!';
+        return {
+            answer
+        };
     }
-}));
-bot.onText(/\/help/, (msg, match) => {
-    const chatId = msg.chat.id;
+});
+exports.unknownMessage = unknownMessage;
+const helpMessage = () => {
     const briefInfo = "I am a bot that allows you to easily follow the hype crypt :)";
     let commandsList = '';
     myCommands.forEach(element => {
         commandsList += `${element.command} - ${element.description}\n\n`;
     });
-    bot.sendMessage(chatId, `${briefInfo}\n\n${commandsList}`);
-});
-bot.onText(/\/start/, (msg, match) => {
-    const chatId = msg.chat.id;
-    const welcome = `${msg.chat.first_name}, welcome to Lambda_Task6 chat bot :)`;
-    bot.sendMessage(chatId, welcome);
-});
-bot.onText(/\/listRecent/, (msg, match) => __awaiter(void 0, void 0, void 0, function* () {
-    const chatId = msg.chat.id;
+    const answer = `${briefInfo}\n\n${commandsList}`;
+    return {
+        answer
+    };
+};
+exports.helpMessage = helpMessage;
+const startMessage = (firstName) => {
+    return {
+        answer: `${firstName}, welcome to Lambda_Task6 chat bot :)`
+    };
+};
+exports.startMessage = startMessage;
+const listRecentMessage = () => __awaiter(void 0, void 0, void 0, function* () {
     const { data } = yield (0, currency_1.getCurrencies)();
     const list = formList(data);
-    bot.sendMessage(chatId, list);
-}));
-bot.onText(/\/(.+)/, (msg, match) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const chatId = msg.chat.id;
-    const userId = (_a = msg.from) === null || _a === void 0 ? void 0 : _a.id;
+    return {
+        answer: list
+    };
+});
+exports.listRecentMessage = listRecentMessage;
+const getCurrencyInfoMessage = (userId, resp) => __awaiter(void 0, void 0, void 0, function* () {
     const { data } = yield (0, currency_1.getCurrencies)();
-    const resp = match[1];
     const isMatch = data.filter((el) => el.symbol.toLowerCase() === resp);
+    let isTrue = false;
     if (isMatch.length > 0) {
         const alreadyAdded = yield (0, telegram_1.getOneFavorite)(userId, isMatch[0].symbol);
         let opts;
@@ -82,20 +75,32 @@ bot.onText(/\/(.+)/, (msg, match) => __awaiter(void 0, void 0, void 0, function*
         else {
             opts = configureOptions(false);
         }
-        const res = getDetailedInfo(isMatch);
-        bot.sendMessage(chatId, res, opts);
+        const msg = getDetailedInfo(isMatch);
+        isTrue = true;
+        return {
+            answer: {
+                msg,
+                opts,
+                isTrue
+            }
+        };
     }
-}));
-bot.onText(/\/addToFavorite (.+)/, (msg, match) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c;
+    return {
+        answer: {
+            msg: '',
+            opts: {},
+            isTrue
+        }
+    };
+});
+exports.getCurrencyInfoMessage = getCurrencyInfoMessage;
+const addToFavoriteMessage = (chatId, userId, firstName, resp) => __awaiter(void 0, void 0, void 0, function* () {
     const { data } = yield (0, currency_1.getCurrencies)();
-    const chatId = msg.chat.id;
-    const userId = (_b = msg.from) === null || _b === void 0 ? void 0 : _b.id;
-    const firstName = (_c = msg.from) === null || _c === void 0 ? void 0 : _c.first_name;
     let currencySymbol, price;
-    const resp = match[1];
+    let isTrue = false;
     const certainCurrency = data.filter((el) => el.symbol.toLowerCase() === resp);
     if (certainCurrency[0]) {
+        isTrue = true;
         currencySymbol = certainCurrency[0].symbol.toLowerCase();
         price = certainCurrency[0].quote.USD.price.toFixed(2);
         const dbUnit = {
@@ -106,27 +111,51 @@ bot.onText(/\/addToFavorite (.+)/, (msg, match) => __awaiter(void 0, void 0, voi
             price
         };
         const result = yield (0, telegram_1.addToFavorites)(dbUnit);
-        bot.sendMessage(chatId, result === null || result === void 0 ? void 0 : result.message);
+        return {
+            answer: {
+                msg: result === null || result === void 0 ? void 0 : result.message,
+                isTrue
+            }
+        };
     }
-}));
-bot.onText(/\/deleteFavorite (.+)/, (msg, match) => __awaiter(void 0, void 0, void 0, function* () {
-    const chatId = msg.chat.id;
+    return {
+        answer: {
+            msg: '',
+            isTrue
+        }
+    };
+});
+exports.addToFavoriteMessage = addToFavoriteMessage;
+const deleteFavoriteMessage = (currencySymbol) => __awaiter(void 0, void 0, void 0, function* () {
     const { data } = yield (0, currency_1.getCurrencies)();
-    const currencySymbol = match[1];
+    let isTrue = false;
     const certainCurrency = data.filter((el) => el.symbol.toLowerCase() === currencySymbol);
     if (certainCurrency[0]) {
+        isTrue = true;
         const result = yield (0, telegram_1.deleteFavorite)(currencySymbol);
-        bot.sendMessage(chatId, result === null || result === void 0 ? void 0 : result.message);
+        return {
+            answer: {
+                msg: result === null || result === void 0 ? void 0 : result.message,
+                isTrue
+            }
+        };
     }
-}));
-bot.onText(/\/listFavorite/, (msg, match) => __awaiter(void 0, void 0, void 0, function* () {
-    var _d;
-    const chatId = msg.chat.id;
-    const userId = (_d = msg.from) === null || _d === void 0 ? void 0 : _d.id;
+    return {
+        answer: {
+            msg: '',
+            isTrue
+        }
+    };
+});
+exports.deleteFavoriteMessage = deleteFavoriteMessage;
+const listFavoriteMessage = (userId) => __awaiter(void 0, void 0, void 0, function* () {
     const data = (yield (0, telegram_1.getAllFavorites)(userId));
     const list = formListFromDb(data);
-    bot.sendMessage(chatId, list);
-}));
+    return {
+        answer: list
+    };
+});
+exports.listFavoriteMessage = listFavoriteMessage;
 const formList = (array) => {
     const firstTwenty = array.slice().splice(0, 20);
     let resultList = '';
@@ -143,35 +172,30 @@ const formListFromDb = (array) => {
     });
     return resultList;
 };
-bot.on('callback_query', function onCallbackQuery(callbackQuery) {
+const handleCallbackQuery = (action, msg) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f, _g, _h;
-    return __awaiter(this, void 0, void 0, function* () {
-        const action = callbackQuery.data;
-        const msg = callbackQuery.message;
-        const opts = {
-            chat_id: msg.chat.id,
-            message_id: msg.message_id
-        };
-        let text = '';
-        const extraText = (_a = msg.text) === null || _a === void 0 ? void 0 : _a.split(' ');
-        const chatId = (_b = msg.from) === null || _b === void 0 ? void 0 : _b.id;
-        const userId = (_c = msg.chat) === null || _c === void 0 ? void 0 : _c.id;
-        const firstName = (_d = msg.chat) === null || _d === void 0 ? void 0 : _d.first_name;
-        const firstIndex = ((_e = msg.text) === null || _e === void 0 ? void 0 : _e.indexOf('Symbol')) + 8;
-        const secondIndex = (_f = msg.text) === null || _f === void 0 ? void 0 : _f.indexOf('\n');
-        const currencySymbol = (_h = ((_g = msg.text) === null || _g === void 0 ? void 0 : _g.substring(firstIndex, secondIndex))) === null || _h === void 0 ? void 0 : _h.trim().toLowerCase();
-        const price = +(extraText[extraText.length - 1]);
-        if (action === 'add') {
-            yield (0, telegram_1.addToFavorites)({ chatId, userId, firstName, currencySymbol, price });
-            text = `${currencySymbol} was added successfully`;
-        }
-        else {
-            yield (0, telegram_1.deleteFavorite)(currencySymbol);
-            text = `${currencySymbol} was removed successfully`;
-        }
-        bot.editMessageText(text, opts);
-    });
+    let text = '';
+    const extraText = (_a = msg.text) === null || _a === void 0 ? void 0 : _a.split(' ');
+    const chatId = (_b = msg.from) === null || _b === void 0 ? void 0 : _b.id;
+    const userId = (_c = msg.chat) === null || _c === void 0 ? void 0 : _c.id;
+    const firstName = (_d = msg.chat) === null || _d === void 0 ? void 0 : _d.first_name;
+    const firstIndex = ((_e = msg.text) === null || _e === void 0 ? void 0 : _e.indexOf('Symbol')) + 8;
+    const secondIndex = (_f = msg.text) === null || _f === void 0 ? void 0 : _f.indexOf('\n');
+    const currencySymbol = (_h = ((_g = msg.text) === null || _g === void 0 ? void 0 : _g.substring(firstIndex, secondIndex))) === null || _h === void 0 ? void 0 : _h.trim().toLowerCase();
+    const price = +(extraText[extraText.length - 1]);
+    if (action === 'add') {
+        yield (0, telegram_1.addToFavorites)({ chatId, userId, firstName, currencySymbol, price });
+        text = `${currencySymbol} was added successfully`;
+    }
+    else {
+        yield (0, telegram_1.deleteFavorite)(currencySymbol);
+        text = `${currencySymbol} was removed successfully`;
+    }
+    return {
+        answer: text
+    };
 });
+exports.handleCallbackQuery = handleCallbackQuery;
 const getDetailedInfo = (array) => {
     const currency = array[0];
     const result = `Name: ${currency.name} | Symbol: ${currency.symbol} \n CMC rank: ${currency.cmc_rank} | Cost: $ ${currency.quote.USD.price.toFixed(2)}`;
@@ -204,4 +228,3 @@ const configureOptions = (alreadyAdded) => {
             }
         };
 };
-exports.default = bot;

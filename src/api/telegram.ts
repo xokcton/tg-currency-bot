@@ -1,5 +1,3 @@
-import TelegramBot from 'node-telegram-bot-api'
-import dotenv from 'dotenv'
 import { getCurrencies } from './currency'
 import { addToFavorites, deleteFavorite, getAllFavorites, getOneFavorite } from '../controllers/telegram'
 import Favorites from '../models/favorites'
@@ -9,9 +7,6 @@ interface ICommands{
   description: string
 }
 
-dotenv.config()
-const { TOKEN, SERVER_URL }  = process.env
-const bot = new TelegramBot(`${TOKEN}`)
 const myCommands: ICommands[] = [
   {command: '/start', description: 'Bot greeting'},
   {command: '/help', description: 'Brief information about the bot and its list of commands'},
@@ -21,16 +16,8 @@ const myCommands: ICommands[] = [
   {command: '/listFavorite', description: 'Returns a list of selected crypts'},
   {command: '/deleteFavorite', description: 'Removes crypt from "favorites" section'}
 ]
-bot.setWebHook(`${SERVER_URL}/bot${TOKEN}`)
 
-bot.setMyCommands([
-  {command: '/start', description: 'Bot greeting'},
-  {command: '/help', description: 'Brief information about the bot and its list of commands'}
-])
-
-bot.onText(/(.+)/, async (msg, match) => {
-  const chatId = msg.chat.id
-  const resp = match![1]
+export const unknownMessage = async (resp: string) => {
   const newArr = [...myCommands.map(element => element.command)]
   const { data } = await getCurrencies()
 
@@ -40,40 +27,46 @@ bot.onText(/(.+)/, async (msg, match) => {
 
   const index = newArr.indexOf(resp)
   if (index === -1) {
-    bot.sendMessage(chatId, 'I don\'t understand you!')
+    const answer = 'I don\'t understand you!'
+    return {
+      answer
+    }
   }
-})
+}
 
-bot.onText(/\/help/, (msg, match) => {
-  const chatId = msg.chat.id
+export const helpMessage = () => {
   const briefInfo: string = "I am a bot that allows you to easily follow the hype crypt :)"
   let commandsList: string = ''
 
   myCommands.forEach(element => {
     commandsList += `${element.command} - ${element.description}\n\n`
   })
-  bot.sendMessage(chatId, `${briefInfo}\n\n${commandsList}`)
-})
 
-bot.onText(/\/start/, (msg, match) => {
-  const chatId = msg.chat.id
-  const welcome = `${msg.chat.first_name}, welcome to Lambda_Task6 chat bot :)`
-  bot.sendMessage(chatId, welcome)
-})
+  const answer = `${briefInfo}\n\n${commandsList}`
 
-bot.onText(/\/listRecent/, async (msg, match) => {
-  const chatId = msg.chat.id
+  return {
+    answer
+  }
+}
+
+export const startMessage = (firstName: string) => {
+  return {
+    answer: `${firstName}, welcome to Lambda_Task6 chat bot :)`
+  }
+}
+
+export const listRecentMessage = async () => {
   const { data } = await getCurrencies()
   const list = formList(data)
-  bot.sendMessage(chatId, list)
-})
+  return {
+    answer: list
+  }
+}
 
-bot.onText(/\/(.+)/, async (msg, match) => {
-  const chatId = msg.chat.id
-  const userId = msg.from?.id!
+export const getCurrencyInfoMessage = async (userId: number, resp: string) => {
   const { data } = await getCurrencies()
-  const resp = match![1]
   const isMatch = data.filter((el: { symbol: string }) => el.symbol.toLowerCase() === resp)
+  let isTrue: boolean = false
   
   if(isMatch.length > 0){
     const alreadyAdded = await getOneFavorite(userId, isMatch[0].symbol)
@@ -84,21 +77,35 @@ bot.onText(/\/(.+)/, async (msg, match) => {
     else{
       opts = configureOptions(false)
     }
-    const res = getDetailedInfo(isMatch)
-    bot.sendMessage(chatId, res, opts)
-  }
-})
+    const msg = getDetailedInfo(isMatch)
+    isTrue = true
 
-bot.onText(/\/addToFavorite (.+)/, async (msg, match) => {
+    return {
+      answer: {
+        msg,
+        opts,
+        isTrue
+      }
+    }
+  }
+
+  return {
+    answer: {
+      msg: '',
+      opts: {},
+      isTrue
+    }
+  }
+}
+
+export const addToFavoriteMessage = async (chatId: number, userId: number, firstName: string, resp: string) => {
   const { data } = await getCurrencies()
-  const chatId = msg.chat.id
-  const userId = msg.from?.id
-  const firstName = msg.from?.first_name
   let currencySymbol, price
-  const resp = match![1]
+  let isTrue: boolean = false
   const certainCurrency = data.filter((el: { symbol: string }) => el.symbol.toLowerCase() === resp)
   
   if (certainCurrency[0]) {
+    isTrue = true
     currencySymbol = certainCurrency[0].symbol.toLowerCase()
     price = certainCurrency[0].quote.USD.price.toFixed(2)
     const dbUnit = {
@@ -109,29 +116,53 @@ bot.onText(/\/addToFavorite (.+)/, async (msg, match) => {
       price
     } as Favorites
     const result = await addToFavorites(dbUnit)
-    bot.sendMessage(chatId, result?.message!)
+    return {
+      answer: {
+        msg: result?.message!,
+        isTrue
+      }
+    }
   }
-})
 
-bot.onText(/\/deleteFavorite (.+)/, async (msg, match) => {
-  const chatId = msg.chat.id
+  return {
+    answer: {
+      msg: '',
+      isTrue
+    }
+  }
+}
+
+export const deleteFavoriteMessage = async (currencySymbol: string) => {
   const { data } = await getCurrencies()
-  const currencySymbol: string = match![1]
+  let isTrue = false
   const certainCurrency = data.filter((el: { symbol: string }) => el.symbol.toLowerCase() === currencySymbol)
   
   if (certainCurrency[0]) {
+    isTrue = true
     const result = await deleteFavorite(currencySymbol)
-    bot.sendMessage(chatId, result?.message!)
+    return {
+      answer: {
+        msg: result?.message!,
+        isTrue
+      }
+    }
   }
-})
 
-bot.onText(/\/listFavorite/, async (msg, match) => {
-  const chatId = msg.chat.id
-  const userId = msg.from?.id!
+  return {
+    answer: {
+      msg: '',
+      isTrue
+    }
+  }
+}
+
+export const listFavoriteMessage = async (userId: number) => {
   const data = (await getAllFavorites(userId)) as Favorites[]
   const list = formListFromDb(data)
-  bot.sendMessage(chatId, list)
-})
+  return {
+    answer: list
+  }
+}
 
 const formList = (array: Array<any>): string => {
   const firstTwenty = array.slice().splice(0, 20)
@@ -155,15 +186,8 @@ const formListFromDb = (array: Favorites[]): string => {
   return resultList
 }
 
-bot.on('callback_query', async function onCallbackQuery(callbackQuery) {
-  const action = callbackQuery.data
-  const msg = callbackQuery.message!
-  const opts = {
-    chat_id: msg.chat.id,
-    message_id: msg.message_id
-  }
+export const handleCallbackQuery = async (action: string, msg: any) => {
   let text = ''
-
   const extraText = msg.text?.split(' ')!
   const chatId = msg.from?.id!
   const userId = msg.chat?.id!
@@ -181,8 +205,10 @@ bot.on('callback_query', async function onCallbackQuery(callbackQuery) {
     text = `${currencySymbol} was removed successfully`
   }
 
-  bot.editMessageText(text, opts)
-})
+  return {
+    answer: text
+  }
+}
 
 const getDetailedInfo = (array: Array<any>) => {
   const currency = array[0] 
@@ -217,5 +243,3 @@ const configureOptions = (alreadyAdded: boolean) => {
     }
   }
 }
-
-export default bot
