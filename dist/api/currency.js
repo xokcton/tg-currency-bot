@@ -12,18 +12,25 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCurrencies = void 0;
+exports.currency = void 0;
 const dotenv_1 = __importDefault(require("dotenv"));
 const axios_1 = __importDefault(require("axios"));
 dotenv_1.default.config();
-const { CMC_KEY, CMC_URL } = process.env;
-const getCurrencies = () => __awaiter(void 0, void 0, void 0, function* () {
-    const config = {
-        headers: {
-            'X-CMC_PRO_API_KEY': CMC_KEY
-        }
-    };
-    const { data } = yield axios_1.default.get(CMC_URL, config);
-    return data;
-});
-exports.getCurrencies = getCurrencies;
+const CMC_KEY = process.env.CMC_KEY || '';
+const CMC_URL = process.env.CMC_URL || '';
+class Currency {
+    constructor(key, url) {
+        this.key = key;
+        this.url = url;
+        this.getCurrencies = () => __awaiter(this, void 0, void 0, function* () {
+            const config = {
+                headers: {
+                    'X-CMC_PRO_API_KEY': this.key
+                }
+            };
+            const { data } = yield axios_1.default.get(this.url, config);
+            return data;
+        });
+    }
+}
+exports.currency = new Currency(CMC_KEY, CMC_URL);

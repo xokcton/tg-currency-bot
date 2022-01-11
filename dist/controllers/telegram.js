@@ -18,8 +18,10 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const axios_1 = __importDefault(require("axios"));
 const telegram_1 = require("../api/telegram");
 dotenv_1.default.config();
-const { TG_URI, TOKEN } = process.env;
+const TG_URI = process.env.TG_URI || '';
+const TOKEN = process.env.TOKEN || '';
 const endpoint = `${TG_URI}${TOKEN}`;
+const bot = new telegram_1.Telegram();
 const possibleMessages = {
     start: /^\/start$/,
     help: /^\/help$/,
@@ -32,16 +34,18 @@ const possibleMessages = {
 const sendMessageToBot = (chatId, msg, isButton = false, opts = {}) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         if (isButton) {
-            return yield axios_1.default.post(`${endpoint}/sendMessage`, {
+            const response = yield axios_1.default.post(`${endpoint}/sendMessage`, {
                 chat_id: chatId,
                 text: msg,
                 reply_markup: opts.reply_markup
             });
+            return response;
         }
-        return yield axios_1.default.post(`${endpoint}/sendMessage`, {
+        const response = yield axios_1.default.post(`${endpoint}/sendMessage`, {
             chat_id: chatId,
             text: msg,
         });
+        return response;
     }
     catch (error) {
         console.log(error);
@@ -49,10 +53,11 @@ const sendMessageToBot = (chatId, msg, isButton = false, opts = {}) => __awaiter
 });
 const answerCallbackQuery = (callbackId, msg) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        return yield axios_1.default.post(`${endpoint}/answerCallbackQuery`, {
+        const response = yield axios_1.default.post(`${endpoint}/answerCallbackQuery`, {
             callback_query_id: callbackId,
             text: msg,
         });
+        return response;
     }
     catch (error) {
         console.log(error);
@@ -60,10 +65,11 @@ const answerCallbackQuery = (callbackId, msg) => __awaiter(void 0, void 0, void 
 });
 const deleteMessageFromBot = (chatId, messageId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        return yield axios_1.default.post(`${endpoint}/deleteMessage`, {
+        const response = yield axios_1.default.post(`${endpoint}/deleteMessage`, {
             chat_id: chatId,
             message_id: messageId,
         });
+        return response;
     }
     catch (error) {
         console.log(error);
@@ -74,7 +80,7 @@ const getMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     const { message } = req.body;
     let botAnswer = 'I don\'t understand you!';
     if ((_b = (_a = req.body) === null || _a === void 0 ? void 0 : _a.callback_query) === null || _b === void 0 ? void 0 : _b.id) {
-        const { answer } = yield (0, telegram_1.handleCallbackQuery)((_d = (_c = req.body) === null || _c === void 0 ? void 0 : _c.callback_query) === null || _d === void 0 ? void 0 : _d.data, (_f = (_e = req.body) === null || _e === void 0 ? void 0 : _e.callback_query) === null || _f === void 0 ? void 0 : _f.message);
+        const { answer } = yield bot.handleCallbackQuery((_d = (_c = req.body) === null || _c === void 0 ? void 0 : _c.callback_query) === null || _d === void 0 ? void 0 : _d.data, (_f = (_e = req.body) === null || _e === void 0 ? void 0 : _e.callback_query) === null || _f === void 0 ? void 0 : _f.message);
         const callbackResponse = yield answerCallbackQuery((_h = (_g = req.body) === null || _g === void 0 ? void 0 : _g.callback_query) === null || _h === void 0 ? void 0 : _h.id, answer);
         if ((_j = callbackResponse === null || callbackResponse === void 0 ? void 0 : callbackResponse.data) === null || _j === void 0 ? void 0 : _j.ok) {
             const messageId = req.body.callback_query.message.message_id;
@@ -90,41 +96,44 @@ const getMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
     switch (message.text) {
         case message.text.match(possibleMessages.start) && message.text.match(possibleMessages.start)[0]:
-            const startRes = (0, telegram_1.startMessage)(message.from.first_name);
+            const startRes = bot.startMessage(message.from.first_name);
             botAnswer = startRes.answer;
             break;
         case message.text.match(possibleMessages.help) && message.text.match(possibleMessages.help)[0]:
-            const helpRes = (0, telegram_1.helpMessage)();
+            const helpRes = bot.helpMessage();
             botAnswer = helpRes.answer;
             break;
         case message.text.match(possibleMessages.listRecent) && message.text.match(possibleMessages.listRecent)[0]:
-            const listRecentRes = yield (0, telegram_1.listRecentMessage)();
+            const listRecentRes = yield bot.listRecentMessage();
             botAnswer = listRecentRes.answer;
             break;
         case message.text.match(possibleMessages.listFav) && message.text.match(possibleMessages.listFav)[0]:
-            const listFavoriteRes = yield (0, telegram_1.listFavoriteMessage)(message.from.id);
+            const listFavoriteRes = yield bot.listFavoriteMessage(message.from.id);
             botAnswer = listFavoriteRes.answer;
             break;
         case message.text.match(possibleMessages.addToFav) && message.text.match(possibleMessages.addToFav)[0]:
-            const addToFavoriteRes = yield (0, telegram_1.addToFavoriteMessage)(message.chat.id, message.from.id, message.from.first_name, message.text.match(possibleMessages.addToFav)[1]);
+            const addToFavoriteRes = yield bot.addToFavoriteMessage(message.chat.id, message.from.id, message.from.first_name, message.text.match(possibleMessages.addToFav)[1]);
             if (addToFavoriteRes === null || addToFavoriteRes === void 0 ? void 0 : addToFavoriteRes.answer.isTrue)
                 botAnswer = addToFavoriteRes.answer.msg;
             break;
         case message.text.match(possibleMessages.deleteFav) && message.text.match(possibleMessages.deleteFav)[0]:
-            const deleteFavoriteRes = yield (0, telegram_1.deleteFavoriteMessage)(message.text.match(possibleMessages.deleteFav)[1]);
+            const deleteFavoriteRes = yield bot.deleteFavoriteMessage(message.text.match(possibleMessages.deleteFav)[1]);
             if (deleteFavoriteRes === null || deleteFavoriteRes === void 0 ? void 0 : deleteFavoriteRes.answer.isTrue)
                 botAnswer = deleteFavoriteRes.answer.msg;
             break;
         case message.text.match(possibleMessages.currencyInfo) && message.text.match(possibleMessages.currencyInfo)[0]:
-            const currencyInfoRes = yield (0, telegram_1.getCurrencyInfoMessage)(message.from.id, message.text.split('/')[1]);
+            const currencyInfoRes = yield bot.getCurrencyInfoMessage(message.from.id, message.text.split('/')[1]);
             if (currencyInfoRes === null || currencyInfoRes === void 0 ? void 0 : currencyInfoRes.answer.isTrue) {
                 yield sendMessageToBot(message.chat.id, (_l = currencyInfoRes === null || currencyInfoRes === void 0 ? void 0 : currencyInfoRes.answer) === null || _l === void 0 ? void 0 : _l.msg, true, (_m = currencyInfoRes === null || currencyInfoRes === void 0 ? void 0 : currencyInfoRes.answer) === null || _m === void 0 ? void 0 : _m.opts);
                 return res.end();
             }
             break;
         default:
-            const unknownRes = yield (0, telegram_1.unknownMessage)(message.text);
-            botAnswer = unknownRes.answer;
+            const unknownRes = yield bot.unknownMessage(message.text);
+            let answer = '';
+            if (unknownRes)
+                answer = unknownRes.answer;
+            botAnswer = answer;
             break;
     }
     yield sendMessageToBot(message.chat.id, botAnswer);

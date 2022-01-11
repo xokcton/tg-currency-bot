@@ -5,4 +5,5 @@ export const errorHandler = (err: HttpException, req: Request, res: Response, ne
   const status = err.status || 500;
   const message = err.message || 'Something went wrong';
   res.status(status).send({ message })
+  next()
 }

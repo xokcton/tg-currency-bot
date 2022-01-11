@@ -4,20 +4,14 @@ import Favorites from "../models/favorites";
 import dotenv from 'dotenv'
 import axios from 'axios'
 import {
-  listFavoriteMessage,
-  deleteFavoriteMessage,
-  addToFavoriteMessage,
-  getCurrencyInfoMessage,
-  listRecentMessage,
-  startMessage,
-  helpMessage,
-  unknownMessage,
-  handleCallbackQuery
+  Telegram
 } from '../api/telegram'
 
 dotenv.config()
-const { TG_URI, TOKEN } = process.env
+const TG_URI = process.env.TG_URI || ''
+const TOKEN = process.env.TOKEN || ''
 const endpoint = `${TG_URI}${TOKEN}`
+const bot = new Telegram()
 const possibleMessages = {
   start: /^\/start$/,
   help: /^\/help$/,
@@ -28,19 +22,21 @@ const possibleMessages = {
   currencyInfo: /^\/(.+)$/
 }
 
-const sendMessageToBot = async (chatId: number, msg: string, isButton: boolean = false, opts: any = {}) => {
+const sendMessageToBot = async (chatId: number, msg: string, isButton = false, opts: any = {}) => {
   try {
     if (isButton) {
-      return await axios.post(`${endpoint}/sendMessage`, {
+      const response = await axios.post(`${endpoint}/sendMessage`, {
         chat_id: chatId,
         text: msg,
         reply_markup: opts.reply_markup
       })
+      return response
     }
-    return await axios.post(`${endpoint}/sendMessage`, {
+    const response = await axios.post(`${endpoint}/sendMessage`, {
       chat_id: chatId,
       text: msg,
     })
+    return response
   } catch (error) {
     console.log(error)
   }
@@ -48,10 +44,11 @@ const sendMessageToBot = async (chatId: number, msg: string, isButton: boolean =
 
 const answerCallbackQuery = async (callbackId: number, msg: string) => {
   try {
-    return await axios.post(`${endpoint}/answerCallbackQuery`, {
+    const response = await axios.post(`${endpoint}/answerCallbackQuery`, {
       callback_query_id: callbackId,
       text: msg,
     })
+    return response
   } catch (error) {
     console.log(error)
   }
@@ -59,10 +56,11 @@ const answerCallbackQuery = async (callbackId: number, msg: string) => {
 
 const deleteMessageFromBot = async (chatId: number, messageId: number) => {
   try {
-    return await axios.post(`${endpoint}/deleteMessage`, {
+    const response = await axios.post(`${endpoint}/deleteMessage`, {
       chat_id: chatId,
       message_id: messageId,
     })
+    return response
   } catch (error) {
     console.log(error)
   }
@@ -70,10 +68,10 @@ const deleteMessageFromBot = async (chatId: number, messageId: number) => {
 
 export const getMessage: RequestHandler = async (req, res) => {
   const { message } = req.body
-  let botAnswer: string = 'I don\'t understand you!'
+  let botAnswer = 'I don\'t understand you!'
 
   if (req.body?.callback_query?.id) {
-    const { answer } = await handleCallbackQuery(req.body?.callback_query?.data, req.body?.callback_query?.message)
+    const { answer } = await bot.handleCallbackQuery(req.body?.callback_query?.data, req.body?.callback_query?.message)
     const callbackResponse = await answerCallbackQuery(req.body?.callback_query?.id, answer)
     if (callbackResponse?.data?.ok){
       const messageId = req.body.callback_query.message.message_id
@@ -91,39 +89,41 @@ export const getMessage: RequestHandler = async (req, res) => {
 
   switch (message.text) {
     case message.text.match(possibleMessages.start) && message.text.match(possibleMessages.start)[0]:
-      const startRes = startMessage(message.from.first_name)
+      const startRes = bot.startMessage(message.from.first_name)
       botAnswer = startRes.answer
       break
     case message.text.match(possibleMessages.help) && message.text.match(possibleMessages.help)[0]:
-      const helpRes = helpMessage()
+      const helpRes = bot.helpMessage()
       botAnswer = helpRes.answer
       break
     case message.text.match(possibleMessages.listRecent) && message.text.match(possibleMessages.listRecent)[0]:
-      const listRecentRes = await listRecentMessage()
+      const listRecentRes = await bot.listRecentMessage()
       botAnswer = listRecentRes.answer
       break
     case message.text.match(possibleMessages.listFav) && message.text.match(possibleMessages.listFav)[0]:
-      const listFavoriteRes = await listFavoriteMessage(message.from.id)
+      const listFavoriteRes = await bot.listFavoriteMessage(message.from.id)
       botAnswer = listFavoriteRes.answer
       break
     case message.text.match(possibleMessages.addToFav) && message.text.match(possibleMessages.addToFav)[0]:
-      const addToFavoriteRes = await addToFavoriteMessage(message.chat.id, message.from.id, message.from.first_name, message.text.match(possibleMessages.addToFav)[1])
+      const addToFavoriteRes = await bot.addToFavoriteMessage(message.chat.id, message.from.id, message.from.first_name, message.text.match(possibleMessages.addToFav)[1])
       if (addToFavoriteRes?.answer.isTrue) botAnswer = addToFavoriteRes.answer.msg
       break
     case message.text.match(possibleMessages.deleteFav) && message.text.match(possibleMessages.deleteFav)[0]:
-      const deleteFavoriteRes = await deleteFavoriteMessage(message.text.match(possibleMessages.deleteFav)[1])
+      const deleteFavoriteRes = await bot.deleteFavoriteMessage(message.text.match(possibleMessages.deleteFav)[1])
       if (deleteFavoriteRes?.answer.isTrue) botAnswer = deleteFavoriteRes.answer.msg
       break
     case message.text.match(possibleMessages.currencyInfo) && message.text.match(possibleMessages.currencyInfo)[0]:
-      const currencyInfoRes = await getCurrencyInfoMessage(message.from.id, message.text.split('/')[1])
+      const currencyInfoRes = await bot.getCurrencyInfoMessage(message.from.id, message.text.split('/')[1])
       if (currencyInfoRes?.answer.isTrue){
         await sendMessageToBot(message.chat.id, currencyInfoRes?.answer?.msg, true, currencyInfoRes?.answer?.opts)
         return res.end()
       }
       break
     default:
-      const unknownRes = await unknownMessage(message.text)
-      botAnswer = unknownRes!.answer
+      const unknownRes = await bot.unknownMessage(message.text)
+      let answer = ''
+      if (unknownRes) answer = unknownRes.answer
+      botAnswer = answer
       break
   }
 
